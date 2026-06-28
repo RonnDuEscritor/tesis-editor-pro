@@ -1,0 +1,101 @@
+[
+  {
+    "name": "projects",
+    "type": "base",
+    "system": false,
+    "schema": [
+      { "name": "user",        "type": "relation", "required": true,  "options": { "collectionId": "_pb_users_auth_", "cascadeDelete": true } },
+      { "name": "title",       "type": "text",     "required": true,  "options": { "min": 1, "max": 200 } },
+      { "name": "tipo",        "type": "number",   "required": true,  "options": { "min": 0, "max": 2 } },
+      { "name": "norma",       "type": "select",   "required": true,  "options": { "values": ["libre","apa","vancouver"] } },
+      { "name": "institution", "type": "text",     "required": false, "options": {} },
+      { "name": "author",      "type": "text",     "required": false, "options": {} },
+      { "name": "tutor",       "type": "text",     "required": false, "options": {} },
+      { "name": "year",        "type": "number",   "required": false, "options": {} },
+      { "name": "word_count",  "type": "number",   "required": false, "options": {} },
+      { "name": "settings",    "type": "json",     "required": false, "options": {} }
+    ],
+    "listRule":   "@request.auth.id != '' && user = @request.auth.id",
+    "viewRule":   "@request.auth.id != '' && user = @request.auth.id",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != '' && user = @request.auth.id",
+    "deleteRule": "@request.auth.id != '' && user = @request.auth.id"
+  },
+  {
+    "name": "sections",
+    "type": "base",
+    "system": false,
+    "schema": [
+      { "name": "project",     "type": "relation", "required": true,  "options": { "collectionId": "projects", "cascadeDelete": true } },
+      { "name": "name",        "type": "text",     "required": true,  "options": {} },
+      { "name": "fase",        "type": "text",     "required": true,  "options": {} },
+      { "name": "order_index", "type": "number",   "required": true,  "options": {} },
+      { "name": "is_roman",    "type": "bool",     "required": false, "options": {} },
+      { "name": "content",     "type": "json",     "required": false, "options": {} },
+      { "name": "word_count",  "type": "number",   "required": false, "options": {} }
+    ],
+    "listRule":   "@request.auth.id != '' && project.user = @request.auth.id",
+    "viewRule":   "@request.auth.id != '' && project.user = @request.auth.id",
+    "createRule": "@request.auth.id != '' && project.user = @request.auth.id",
+    "updateRule": "@request.auth.id != '' && project.user = @request.auth.id",
+    "deleteRule": "@request.auth.id != '' && project.user = @request.auth.id"
+  },
+  {
+    "name": "references",
+    "type": "base",
+    "system": false,
+    "schema": [
+      { "name": "project",   "type": "relation", "required": true,  "options": { "collectionId": "projects", "cascadeDelete": true } },
+      { "name": "author",    "type": "text",     "required": true,  "options": {} },
+      { "name": "initial",   "type": "text",     "required": false, "options": {} },
+      { "name": "year",      "type": "text",     "required": true,  "options": {} },
+      { "name": "ref_type",  "type": "select",   "required": true,  "options": { "values": ["libro","articulo","tesis","web","capitulo"] } },
+      { "name": "title",     "type": "text",     "required": true,  "options": {} },
+      { "name": "publisher", "type": "text",     "required": false, "options": {} },
+      { "name": "journal",   "type": "text",     "required": false, "options": {} },
+      { "name": "volume",    "type": "text",     "required": false, "options": {} },
+      { "name": "issue",     "type": "text",     "required": false, "options": {} },
+      { "name": "doi",       "type": "text",     "required": false, "options": {} },
+      { "name": "url",       "type": "url",      "required": false, "options": {} },
+      { "name": "pages",     "type": "text",     "required": false, "options": {} }
+    ],
+    "listRule":   "@request.auth.id != '' && project.user = @request.auth.id",
+    "viewRule":   "@request.auth.id != '' && project.user = @request.auth.id",
+    "createRule": "@request.auth.id != '' && project.user = @request.auth.id",
+    "updateRule": "@request.auth.id != '' && project.user = @request.auth.id",
+    "deleteRule": "@request.auth.id != '' && project.user = @request.auth.id"
+  },
+  {
+    "name": "citations",
+    "type": "base",
+    "system": false,
+    "schema": [
+      { "name": "project",             "type": "relation", "required": true,  "options": { "collectionId": "projects",    "cascadeDelete": true } },
+      { "name": "section",             "type": "relation", "required": true,  "options": { "collectionId": "sections",    "cascadeDelete": true } },
+      { "name": "reference",           "type": "relation", "required": true,  "options": { "collectionId": "references",  "cascadeDelete": true } },
+      { "name": "page_ref",            "type": "text",     "required": false, "options": {} },
+      { "name": "order_of_appearance", "type": "number",   "required": false, "options": {} }
+    ],
+    "listRule":   "@request.auth.id != '' && project.user = @request.auth.id",
+    "viewRule":   "@request.auth.id != '' && project.user = @request.auth.id",
+    "createRule": "@request.auth.id != '' && project.user = @request.auth.id",
+    "updateRule": "@request.auth.id != '' && project.user = @request.auth.id",
+    "deleteRule": "@request.auth.id != '' && project.user = @request.auth.id"
+  },
+  {
+    "name": "versions",
+    "type": "base",
+    "system": false,
+    "schema": [
+      { "name": "project",  "type": "relation", "required": true,  "options": { "collectionId": "projects", "cascadeDelete": true } },
+      { "name": "label",    "type": "text",     "required": true,  "options": {} },
+      { "name": "snapshot", "type": "json",     "required": true,  "options": {} },
+      { "name": "auto",     "type": "bool",     "required": false, "options": {} }
+    ],
+    "listRule":   "@request.auth.id != '' && project.user = @request.auth.id",
+    "viewRule":   "@request.auth.id != '' && project.user = @request.auth.id",
+    "createRule": "@request.auth.id != '' && project.user = @request.auth.id",
+    "updateRule": null,
+    "deleteRule": "@request.auth.id != '' && project.user = @request.auth.id"
+  }
+]
