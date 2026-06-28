@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: tesis-editor-pro
+    env: docker
+    dockerfilePath: tep/backend/Dockerfile
+    plan: free
+    disk:
+      name: pb-data
+      mountPath: /pb/pb_data
+      sizeGB: 1
