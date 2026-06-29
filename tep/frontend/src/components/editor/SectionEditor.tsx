@@ -1,130 +1,134 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import TextStyle from '@tiptap/extension-text-style'
-import Color from '@tiptap/extension-color'
-import Highlight from '@tiptap/extension-highlight'
-import Image from '@tiptap/extension-image'
-import Link from '@tiptap/extension-link'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
-import CharacterCount from '@tiptap/extension-character-count'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Extension } from '@tiptap/core'
+import { pb } from '@/lib/pb'
 import { useStore } from '@/store'
 import { countWords } from '@/lib/utils'
-import type { PBSection, TiptapDoc } from '@/types'
-
-// ── CITE CHIP EXTENSION ──────────────────────────────────────
-const CiteChipExtension = Extension.create({
-  name: 'citeChip',
-  addKeyboardShortcuts() { return {} },
-})
+import type { TiptapDoc } from '@/types'
 
 interface SectionEditorProps {
-  section: PBSection
-  pageNum: string
+  sectionId:   string
+  sectionName: string
+  fase:        string
+  isRoman:     boolean
+  content:     object | null
+  wordCount:   number
+  pageNum:     string
   tesisTitulo: string
-  normaClass: string
+  normaClass:  string
+  projectId:   string
 }
 
-export default function SectionEditor({ section, pageNum, tesisTitulo, normaClass }: SectionEditorProps) {
+export default function SectionEditor({
+  sectionId, sectionName, fase, isRoman,
+  content, pageNum, tesisTitulo, normaClass, projectId
+}: SectionEditorProps) {
   const { activeSectionId, setActiveSection, saveSectionContent } = useStore()
-  const isActive = activeSectionId === section.id
+  const isActive  = activeSectionId === sectionId
+  const isVirtual = sectionId.startsWith('virtual-')
+  const pbIdRef   = useRef<string | null>(isVirtual ? null : sectionId)
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ history: { depth: 50 } }),
       Underline,
-      TextAlign.configure({ types: ['heading','paragraph'] }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
       TextStyle,
-      Color,
-      Highlight.configure({ multicolor: true }),
-      Image.configure({ inline: true }),
-      Link.configure({ openOnClick: false }),
       Table.configure({ resizable: true }),
       TableRow, TableCell, TableHeader,
-      CharacterCount,
       Placeholder.configure({
-        placeholder: `Escribe aquí el contenido de "${section.name}"…`,
+        placeholder: `Escribe aquÃ­ el contenido de "${sectionName}"â€¦`,
         emptyEditorClass: 'is-editor-empty',
       }),
-      CiteChipExtension,
     ],
-    content: section.content as TiptapDoc ?? undefined,
+    content: (content as TiptapDoc) ?? undefined,
     onUpdate: ({ editor }) => {
-      const json = editor.getJSON() as TiptapDoc
-      const wc   = countWords(json as unknown as import('@/types').TiptapNode)
-      saveSectionContent(section.id, json, wc)
+      const json     = editor.getJSON() as TiptapDoc
+      const wc       = countWords(json as any)
+      handleSave(json, wc)
     },
     editorProps: {
-      attributes: {
-        class: 'tiptap',
-        'data-section-id': section.id,
-      },
+      attributes: { class: 'tiptap' },
     },
   })
 
-  // ── Listen for insert-cite event from ReferencesPanel ────
+  // Save â€” creates PocketBase record if virtual, updates if exists
+  const handleSave = useCallback(async (json: TiptapDoc, wc: number) => {
+    if (!pbIdRef.current) {
+      // First time writing in a virtual section â€” create it in PocketBase
+      try {
+        const rec = await pb.collection('sections').create({
+          project:     projectId,
+          name:        sectionName,
+          fase:        fase,
+          order_index: 0,
+          word_count:  wc,
+          content:     json,
+        })
+        pbIdRef.current = rec.id
+        saveSectionContent(rec.id, json, wc)
+      } catch (e) {
+        console.error('Error creating section:', e)
+      }
+    } else {
+      // Update existing section
+      saveSectionContent(pbIdRef.current, json, wc)
+    }
+  }, [projectId, sectionName, fase, saveSectionContent])
+
+  // Expose editor to toolbar
+  useEffect(() => {
+    if (isActive && editor) {
+      window.dispatchEvent(new CustomEvent('active-editor', {
+        detail: { editor, sectionId: pbIdRef.current ?? sectionId }
+      }))
+    }
+  }, [isActive, editor, sectionId])
+
+  // Listen for cite insertion
   const handleInsertCite = useCallback((e: Event) => {
-    const { refId, citeText, sectionId } = (e as CustomEvent).detail
-    if (sectionId !== section.id || !editor) return
-    editor
-      .chain()
-      .focus()
-      .insertContent({
-        type: 'text',
-        text: citeText,
-        marks: [{ type: 'textStyle', attrs: { class: 'cite-chip', 'data-ref-id': refId } }],
-      })
-      .insertContent(' ')
-      .run()
-  }, [editor, section.id])
+    const { citeText, sectionId: targetId } = (e as CustomEvent).detail
+    if (targetId !== (pbIdRef.current ?? sectionId) || !editor) return
+    editor.chain().focus().insertContent(
+      `<span class="cite-chip">${citeText}</span>&nbsp;`
+    ).run()
+  }, [editor, sectionId])
 
   useEffect(() => {
     window.addEventListener('insert-cite', handleInsertCite)
     return () => window.removeEventListener('insert-cite', handleInsertCite)
   }, [handleInsertCite])
 
-  // ── Expose editor to toolbar ──────────────────────────────
-  useEffect(() => {
-    if (isActive && editor) {
-      window.dispatchEvent(new CustomEvent('active-editor', { detail: { editor, sectionId: section.id } }))
-    }
-  }, [isActive, editor, section.id])
-
-  const handleFocus = () => setActiveSection(section.id)
+  const handleFocus = () => setActiveSection(pbIdRef.current ?? sectionId)
 
   return (
-    <div id={`section-${section.id}`}
+    <div
+      id={`section-${sectionId}`}
       className={`a4-page ${normaClass} transition-shadow ${isActive ? 'ring-1 ring-brand-400/30' : ''}`}>
 
-      {/* Page header */}
       <div className="page-header">
         <span>{tesisTitulo}</span>
         <span>TesisEditor Pro</span>
       </div>
 
-      {/* Section anchor label */}
-      <span className="section-anchor-label">{section.fase} › {section.name}</span>
+      <span className="section-anchor-label">
+        {fase} â€º {sectionName}
+      </span>
 
-      {/* Tiptap editor */}
       <EditorContent
         editor={editor}
         onClick={handleFocus}
         onFocus={handleFocus}
       />
 
-      {/* Word count badge */}
-      <div className="absolute bottom-2 right-4 text-xs text-gray-300 select-none">
-        {section.word_count > 0 && `${section.word_count} pal.`}
-      </div>
-
-      {/* Page footer */}
       <div className="page-footer">
         <span>{pageNum}</span>
       </div>
